@@ -1,0 +1,103 @@
+{
+  "activities": [
+    {
+      "name": "lkp_tablas",
+      "type": "Lookup",
+      "typeProperties": {
+        "source": {
+          "type": "AzureSqlSource",
+          "sqlReaderQuery": "SELECT tabla, valor_watermark AS marca FROM cobranzas.ctl_watermarks"
+        },
+        "dataset": {
+          "referenceName": "ds_azuresql_generico",
+          "type": "DatasetReference",
+          "parameters": { "esquema": "cobranzas", "tabla": "ctl_watermarks" }
+        },
+        "firstRowOnly": false
+      }
+    },
+    {
+      "name": "fe_tablas",
+      "type": "ForEach",
+      "dependsOn": [
+        { "activity": "lkp_tablas", "dependencyConditions": ["Succeeded"] }
+      ],
+      "typeProperties": {
+        "items": { "value": "@activity('lkp_tablas').output.value", "type": "Expression" },
+        "isSequential": false,
+        "batchCount": 3,
+        "activities": [
+          {
+            "name": "cp_cobranzas_a_landing",
+            "type": "Copy",
+            "inputs": [{
+              "referenceName": "ds_azuresql_generico",
+              "type": "DatasetReference",
+              "parameters": { "esquema": "cobranzas", "tabla": "@{item().tabla}" }
+            }],
+            "outputs": [{
+              "referenceName": "ds_adls_parquet",
+              "type": "DatasetReference",
+              "parameters": {
+                "carpeta": "@{concat('cobranzas/', item().tabla, '/', formatDateTime(utcnow(),'yyyy/MM/dd'))}"
+              }
+            }],
+            "typeProperties": {
+              "source": {
+                "type": "AzureSqlSource",
+                "sqlReaderQuery": {
+                  "value": "SELECT * FROM cobranzas.@{item().tabla} WHERE fecha_modificacion > '@{item().marca}'",
+                  "type": "Expression"
+                }
+              },
+              "sink": { "type": "ParquetSink" },
+              "parallelCopies": 4,
+              "enableStaging": false
+            },
+            "policy": { "retry": 3, "retryIntervalInSeconds": 60, "timeout": "01:00:00" }
+          },
+          {
+            "name": "lkp_nueva_marca",
+            "type": "Lookup",
+            "dependsOn": [
+              { "activity": "cp_cobranzas_a_landing", "dependencyConditions": ["Succeeded"] }
+            ],
+            "typeProperties": {
+              "source": {
+                "type": "AzureSqlSource",
+                "sqlReaderQuery": {
+                  "value": "SELECT MAX(fecha_modificacion) AS marca FROM cobranzas.@{item().tabla}",
+                  "type": "Expression"
+                }
+              },
+              "dataset": {
+                "referenceName": "ds_azuresql_generico",
+                "type": "DatasetReference",
+                "parameters": { "esquema": "cobranzas", "tabla": "@{item().tabla}" }
+              },
+              "firstRowOnly": true
+            }
+          },
+          {
+            "name": "sp_actualizar_watermark",
+            "type": "SqlServerStoredProcedure",
+            "dependsOn": [
+              { "activity": "lkp_nueva_marca", "dependencyConditions": ["Succeeded"] }
+            ],
+            "typeProperties": {
+              "storedProcedureName": "[cobranzas].[sp_actualizar_watermark]",
+              "storedProcedureParameters": {
+                "tabla": { "value": "@{item().tabla}", "type": "String" },
+                "nueva_marca": { "value": "@{activity('lkp_nueva_marca').output.firstRow.marca}", "type": "DateTime" }
+              }
+            },
+            "linkedServiceName": {
+              "referenceName": "ls_azuresql_wizardbank",
+              "type": "LinkedServiceReference"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "ds_adls_parquet",
+  "properties": {
+    "type": "Parquet",
+    "linkedServiceName": {
+      "referenceName": "ls_adls_wizardbank",
+      "type": "LinkedServiceReference"
+    },
+    "parameters": {
+      "carpeta": { "type": "string" }
+    },
+    "typeProperties": {
+      "location": {
+        "type": "AzureBlobFSLocation",
+        "fileSystem": "landing",
+        "folderPath": { "value": "@dataset().carpeta", "type": "Expression" }
+      }
+    }
+  }
+}

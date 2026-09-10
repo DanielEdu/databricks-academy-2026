@@ -1,0 +1,12 @@
+{
+  "type": "AzureSqlTable",
+  "linkedServiceName": { "referenceName": "ls_azuresql_wizardbank", "type": "LinkedServiceReference" },
+  "parameters": {
+    "esquema": { "type": "string" },
+    "tabla":   { "type": "string" }
+  },
+  "typeProperties": {
+    "schema": { "value": "@dataset().esquema", "type": "Expression" },
+    "table":  { "value": "@dataset().tabla",   "type": "Expression" }
+  }
+}

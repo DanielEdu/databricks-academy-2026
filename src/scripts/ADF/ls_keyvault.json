@@ -1,0 +1,6 @@
+{
+  "type": "AzureKeyVault",
+  "typeProperties": {
+    "baseUrl": "https://kv-wizardbank.vault.azure.net/"
+  }
+}

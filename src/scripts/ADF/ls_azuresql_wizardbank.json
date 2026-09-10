@@ -1,0 +1,11 @@
+{
+  "type": "AzureSqlDatabase",
+  "typeProperties": {
+    "connectionString": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=<server>.database.windows.net;Initial Catalog=wizardbank;User ID=<user>",
+    "password": {
+      "type": "AzureKeyVaultSecret",
+      "store": { "referenceName": "ls_keyvault", "type": "LinkedServiceReference" },
+      "secretName": "azuresql-wizardbank-password"
+    }
+  }
+}
