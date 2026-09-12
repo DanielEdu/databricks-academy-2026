@@ -1,0 +1,45 @@
+# Streaming ingestion job: reads the `wizard.lending.eventos-app` topic (Azure
+# Event Hubs, Kafka-compatible endpoint) and lands events into Unity Catalog
+# Bronze as a single append-only table.
+#
+# Runs as a job-level `continuous` trigger. Serverless compute only supports
+# bounded Structured Streaming triggers (Trigger.AvailableNow) — time-based
+# triggers like processingTime/Trigger.Continuous fail with
+# INFINITE_STREAMING_TRIGGER_NOT_SUPPORTED. So the notebook query itself uses
+# trigger(availableNow=True), and the job scheduler restarts the task as soon
+# as it completes; the streaming checkpoint guarantees no data is reprocessed
+# across restarts. Net effect: near-real-time, always-on ingestion.
+
+resources:
+  jobs:
+    kafka_telemetria_app_to_bronze:
+      name: kafka_telemetria_app_to_bronze
+
+      continuous:
+        pause_status: PAUSED
+
+      #email_notifications:
+      #  on_failure:
+      #    - your_email@example.com
+
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+        - name: table
+          default: ${var.table}
+        - name: kafka_topic
+          default: ${var.kafka_topic}
+        - name: checkpoint_path
+          default: ${var.checkpoint_path}
+
+      tasks:
+        - task_key: ingest_stream
+          notebook_task:
+            notebook_path: ../src/ingest_kafka_streaming.py
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"
