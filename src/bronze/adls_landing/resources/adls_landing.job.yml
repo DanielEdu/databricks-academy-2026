@@ -1,6 +1,8 @@
 # Ingests each source table from the ADLS landing layer into Unity Catalog Bronze
-# using Auto Loader. One task per table, all running the same parameterized
-# notebook (../src/ingest_autoloader.py).
+# using Auto Loader. Two tasks per table: a DDL task (../src/create_bronze_tables.py)
+# that creates the table explicitly (all columns STRING + standardized control
+# columns) if it does not exist yet, followed by the ingestion task
+# (../src/ingest_autoloader.py) that Auto Loader appends to.
 
 resources:
   jobs:
@@ -10,7 +12,7 @@ resources:
       schedule:
         quartz_cron_expression: "0 0 0 * * ?" # Every day at 12:00 AM
         timezone_id: "America/Lima"
-        pause_status: UNPAUSED
+        pause_status: PAUSED
 
       #email_notifications:
       #  on_failure:
@@ -29,19 +31,43 @@ resources:
           default: ${var.checkpoint_path}
 
       tasks:
+        - task_key: ddl_cuotas
+          notebook_task:
+            notebook_path: ../src/create_bronze_tables.py
+            base_parameters:
+              table: cuotas
+
         - task_key: cuotas
+          depends_on:
+            - task_key: ddl_cuotas
           notebook_task:
             notebook_path: ../src/ingest_autoloader.py
             base_parameters:
               table: cuotas
 
+        - task_key: ddl_gestiones_cobranza
+          notebook_task:
+            notebook_path: ../src/create_bronze_tables.py
+            base_parameters:
+              table: gestiones_cobranza
+
         - task_key: gestiones_cobranza
+          depends_on:
+            - task_key: ddl_gestiones_cobranza
           notebook_task:
             notebook_path: ../src/ingest_autoloader.py
             base_parameters:
               table: gestiones_cobranza
 
+        - task_key: ddl_pagos
+          notebook_task:
+            notebook_path: ../src/create_bronze_tables.py
+            base_parameters:
+              table: pagos
+
         - task_key: pagos
+          depends_on:
+            - task_key: ddl_pagos
           notebook_task:
             notebook_path: ../src/ingest_autoloader.py
             base_parameters:
